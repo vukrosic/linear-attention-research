@@ -1,6 +1,6 @@
 {
   "experiment": "exp11_dynamic_routing",
-  "config_name": "dynamic",
+  "config_name": "dynamic_aggressive",
   "config": {
     "use_dynamic_routing": true,
     "routed_layers": [
@@ -10,10 +10,10 @@
     "hidden_size": 768,
     "num_layers": 4,
     "learning_rate": 0.002,
-    "load_balance_alpha": 0.01
+    "load_balance_alpha": 0.5
   },
   "results": {
-    "total_time": 58.56200981140137,
-    "best_val_loss": 5.702976081378299
+    "total_time": 57.49791622161865,
+    "best_val_loss": 6.249619780211388
   }
 }
