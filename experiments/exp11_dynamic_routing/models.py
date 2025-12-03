@@ -172,7 +172,7 @@ class DynamicRoutingModel(nn.Module):
         temp = self.config.gumbel_temperature - (self.config.gumbel_temperature - self.config.min_temperature) * progress
         return max(temp, self.config.min_temperature)
     
-    def forward(self, input_ids, labels=None, step=0, **kwargs):
+    def forward(self, input_ids, labels=None, step=0, return_routing=False, **kwargs):
         batch_size, seq_len = input_ids.shape
         
         # Embed
@@ -239,6 +239,14 @@ class DynamicRoutingModel(nn.Module):
             
             loss = lm_loss + self.config.load_balance_alpha * aux_loss
         
+        if return_routing:
+            return {
+                'logits': logits,
+                'router_probs': router_probs,
+                'route_layer_1': route_layer_1,
+                'route_layer_2': route_layer_2,
+            }
+
         return CausalLMOutputWithPast(
             loss=loss,
             logits=logits,

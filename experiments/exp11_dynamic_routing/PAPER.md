@@ -1,10 +1,10 @@
-# Adaptive Attention Selection: Dynamic Per-Token Routing Between Linear and Softmax Attention
+# Adaptive Attention Selection: A Proof-of-Concept for Dynamic Routing in Linear Transformers
 
 **Abstract**
 
-Large Language Models (LLMs) rely on attention mechanisms with quadratic complexity O(n²), making inference computationally expensive at scale. Linear attention variants offer O(n) complexity but sacrifice modeling capability. We propose a novel adaptive attention selection mechanism that dynamically routes individual tokens between linear attention (Gated DeltaNet) and softmax attention on a per-layer basis. Our approach uses a lightweight router network with load balancing loss to prevent mode collapse. We compare this dynamic routing approach against a static baseline with identical architectural capacity. [RESULTS PLACEHOLDER: Dynamic routing achieves X% improvement over baseline while maintaining Y% balanced routing distribution]. Our findings suggest that different tokens benefit from different attention mechanisms, opening paths toward more efficient inference without quality degradation.
+Large Language Models (LLMs) rely on attention mechanisms with quadratic complexity O(n²), making inference computationally expensive at scale. Linear attention variants offer O(n) complexity but often sacrifice modeling capability. We propose a novel adaptive attention selection mechanism that dynamically routes individual tokens between linear attention (Gated DeltaNet) and softmax attention on a per-layer basis. In this preliminary study, we demonstrate the feasibility of this architecture using a lightweight router network with load balancing loss. We compare this dynamic routing approach against a static baseline in a controlled, small-scale environment. Our findings provide a proof-of-concept that different tokens can be effectively routed to different attention mechanisms, offering a promising direction for future large-scale efficient inference research.
 
-**Keywords:** Linear Attention, Dynamic Routing, Mixture of Experts, Efficient Transformers, Adaptive Computation
+**Keywords:** Linear Attention, Dynamic Routing, Mixture of Experts, Efficient Transformers, Adaptive Computation, Proof-of-Concept
 
 ---
 
@@ -16,14 +16,17 @@ Recent work has explored linear attention mechanisms that reduce complexity from
 
 We hypothesize that **different tokens require different attention mechanisms**. Simple or repetitive tokens may suffice with efficient linear attention, while complex reasoning or long-range dependencies may require full softmax attention. Rather than fixing which layers use which mechanism, we propose learning to route tokens dynamically.
 
+**Scope of this Work:**
+This paper presents a **proof-of-concept** implementation of dynamic routing between linear and softmax attention. Due to computational constraints, we validate our approach on small-scale models (~50M parameters) and shorter training runs. Our primary contribution is the architectural design and the demonstration of the routing mechanism's stability and behavior, rather than establishing state-of-the-art performance at scale.
+
 **Our Contributions:**
 
-1. A dynamic per-token routing mechanism between linear (GDN) and softmax attention
-2. Application of load balancing techniques to prevent routing collapse
-3. Empirical comparison against matched baseline with identical capacity
-4. Analysis of which tokens prefer which attention mechanisms
+1.  **Architectural Proposal:** A dynamic per-token routing mechanism between linear (GDN) and softmax attention.
+2.  **Stability Mechanisms:** Application of load balancing techniques to prevent routing collapse in this hybrid setting.
+3.  **Preliminary Validation:** Empirical comparison against a matched baseline in a controlled small-scale setting.
+4.  **Routing Analysis:** Initial analysis of token routing patterns, demonstrating that the model learns non-trivial routing strategies.
 
-**Research Question:** Can LLMs dynamically select between O(n) linear attention and O(n²) softmax attention per-token to achieve better performance than static layer assignments?
+**Research Question:** Can a dynamic routing mechanism be successfully trained to select between O(n) and O(n²) attention per-token without collapsing, and does it show potential for efficiency gains?
 
 ---
 
@@ -310,21 +313,18 @@ Given these results, we recommend:
 
 ## 7. Limitations and Future Work
 
-**Current Limitations:**
+**Current Limitations (Proof-of-Concept Scale):**
 
-1. **Small Scale:** 50M parameters, 4 layers. Results may differ at larger scales.
-2. **Short Context:** 1024 tokens. Routing benefits may increase with longer contexts where O(n²) becomes more expensive.
-3. **Limited Training:** 1K steps. Longer training may show different routing patterns.
-4. **Single Dataset:** OpenWebText only. Domain-specific patterns may vary.
+1.  **Small Scale Validation:** Our experiments are conducted on ~50M parameter models due to compute constraints. While this validates the *mechanism*, scaling laws suggest that routing behaviors may evolve at larger scales (1B+ parameters).
+2.  **Short Context & Training:** We train for 1K steps with 1024 context length. The true benefits of O(n) routing are most pronounced at very long contexts (8K+), which were beyond the scope of this initial study.
+3.  **Proxy Metrics:** We use perplexity and loss on a small dataset. Downstream task performance (e.g., reasoning, coding) would provide a more robust measure of "quality" but requires significantly larger models.
 
 **Future Directions:**
 
-1. **Per-Head Routing:** Route at head-level instead of layer-level for finer granularity
-2. **Context-Length Scaling:** Test at 4K, 8K, 16K sequence lengths
-3. **Routing Pattern Analysis:** Investigate which linguistic phenomena route where
-4. **Sequential vs Parallel:** Compare our parallel routing to sequential routing
-5. **Multi-Task:** Evaluate on diverse tasks (code, math, reasoning, creative writing)
-6. **Larger Models:** Scale to 1B+ parameters to validate findings
+1.  **Scaling Up:** The most critical next step is to scale this architecture to 1B+ parameters and train on trillions of tokens to verify if the routing patterns hold.
+2.  **Long-Context Stress Testing:** Evaluating the model on 128k+ context lengths would dramatically highlight the efficiency gains of routing 50% of tokens to linear attention.
+3.  **Per-Head Routing:** Route at head-level instead of layer-level for finer granularity.
+4.  **Interpretability:** Deeper analysis of *why* specific tokens are routed to softmax (e.g., do "needle in a haystack" tokens get routed to softmax?).
 
 ---
 

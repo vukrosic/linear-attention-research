@@ -1,77 +1,67 @@
-"""
-Compare baseline vs dynamic routing results
-"""
-
 import json
-from pathlib import Path
 import matplotlib.pyplot as plt
+import argparse
+from pathlib import Path
+import numpy as np
 
-
-def load_results(config_name):
-    """Load results for a configuration"""
-    results_dir = Path(__file__).parent / f"results_{config_name}"
-    results_file = results_dir / "training_results.json"
-    
-    if not results_file.exists():
-        print(f"⚠️  Results not found for {config_name}: {results_file}")
+def load_history(results_dir):
+    history_path = Path(results_dir) / 'val_history.json'
+    if not history_path.exists():
+        print(f"Warning: No history found at {history_path}")
         return None
     
-    with open(results_file, 'r') as f:
+    with open(history_path, 'r') as f:
         return json.load(f)
 
-
-def main():
-    print("="*70)
-    print("Comparing Baseline vs Dynamic Routing")
-    print("="*70)
+def plot_comparison(baseline_dir, dynamic_dir, output_dir='comparison_results'):
+    output_path = Path(output_dir)
+    output_path.mkdir(exist_ok=True)
     
-    # Load results
-    baseline_results = load_results('baseline')
-    dynamic_results = load_results('dynamic')
+    baseline_hist = load_history(baseline_dir)
+    dynamic_hist = load_history(dynamic_dir)
     
-    if baseline_results is None or dynamic_results is None:
-        print("\n❌ Cannot compare - missing results. Train both models first:")
-        if baseline_results is None:
-            print("   python run_experiment.py --config baseline")
-        if dynamic_results is None:
-            print("   python run_experiment.py --config dynamic")
+    if not baseline_hist or not dynamic_hist:
         return
-    
-    # Compare
-    print("\n📊 Results Comparison:\n")
-    
-    baseline_loss = baseline_results['results']['best_val_loss']
-    dynamic_loss = dynamic_results['results']['best_val_loss']
-    
-    print(f"{'Configuration':<20} {'Best Val Loss':<15} {'Training Time':<15}")
-    print("-" * 50)
-    print(f"{'Baseline (Static)':<20} {baseline_loss:<15.4f} {baseline_results['results']['total_time']:<15.1f}")
-    print(f"{'Dynamic Routing':<20} {dynamic_loss:<15.4f} {dynamic_results['results']['total_time']:<15.1f}")
-    
-    # Winner
-    print("\n" + "="*70)
-    if dynamic_loss < baseline_loss:
-        improvement = ((baseline_loss - dynamic_loss) / baseline_loss) * 100
-        print(f"🏆 WINNER: Dynamic Routing")
-        print(f"   Improvement: {improvement:.2f}% better than baseline")
-        print(f"   Dynamic routing successfully learned better token-specific choices!")
-    elif baseline_loss < dynamic_loss:
-        regression = ((dynamic_loss - baseline_loss) / baseline_loss) * 100
-        print(f"🏆 WINNER: Baseline (Static)")
-        print(f"   Baseline is {regression:.2f}% better")
-        print(f"   Routing overhead may not be worth the complexity")
-        print(f"   Try increasing load_balance_alpha to prevent collapse")
-    else:
-        print(f"🤝 TIE: Both configurations perform equally")
-    
-    print("="*70)
-    
-    # Routing statistics (if available for dynamic)
-    if 'load_balance_alpha' in dynamic_results['config']:
-        print(f"\nDynamic Routing Config:")
-        print(f"   Load balance alpha: {dynamic_results['config']['load_balance_alpha']}")
-        print(f"   Routed layers: {dynamic_results['config']['routed_layers']}")
 
+    # Extract data
+    b_steps = [x['step'] for x in baseline_hist]
+    b_loss = [x['loss'] for x in baseline_hist]
+    b_ppl = [x['perplexity'] for x in baseline_hist]
+    
+    d_steps = [x['step'] for x in dynamic_hist]
+    d_loss = [x['loss'] for x in dynamic_hist]
+    d_ppl = [x['perplexity'] for x in dynamic_hist]
+    
+    # Plot Loss
+    plt.figure(figsize=(10, 6))
+    plt.plot(b_steps, b_loss, label='Baseline (Static)', marker='o', linestyle='--')
+    plt.plot(d_steps, d_loss, label='Dynamic Routing', marker='s')
+    plt.xlabel('Steps')
+    plt.ylabel('Validation Loss')
+    plt.title('Training Convergence: Baseline vs Dynamic')
+    plt.legend()
+    plt.grid(True, alpha=0.3)
+    plt.savefig(output_path / 'loss_comparison.png')
+    plt.close()
+    
+    # Plot Perplexity
+    plt.figure(figsize=(10, 6))
+    plt.plot(b_steps, b_ppl, label='Baseline (Static)', marker='o', linestyle='--')
+    plt.plot(d_steps, d_ppl, label='Dynamic Routing', marker='s')
+    plt.xlabel('Steps')
+    plt.ylabel('Perplexity')
+    plt.title('Perplexity: Baseline vs Dynamic')
+    plt.legend()
+    plt.grid(True, alpha=0.3)
+    plt.savefig(output_path / 'ppl_comparison.png')
+    plt.close()
+    
+    print(f"Plots saved to {output_path}")
 
 if __name__ == "__main__":
-    main()
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--baseline', type=str, default='results_baseline')
+    parser.add_argument('--dynamic', type=str, default='results_dynamic')
+    args = parser.parse_args()
+    
+    plot_comparison(args.baseline, args.dynamic)
