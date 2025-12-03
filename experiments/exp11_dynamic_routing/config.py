@@ -136,7 +136,7 @@ def get_baseline_config():
         
         # Training
         max_seq_len=1024,
-        batch_size=48,
+        batch_size=16,
         max_steps=1000,
         warmup_steps=100,
         learning_rate=1e-3,  # GDN prefers 1e-3
@@ -192,7 +192,7 @@ def get_dynamic_config():
         
         # Training
         max_seq_len=1024,
-        batch_size=48,
+        batch_size=16,
         max_steps=1000,
         warmup_steps=100,
         learning_rate=2e-3,  # Hybrids with attention prefer higher LR (from exp7)

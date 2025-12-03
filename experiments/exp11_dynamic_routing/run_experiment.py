@@ -31,12 +31,85 @@ root_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__fil
 sys.path.insert(0, root_dir)
 
 from experiments.exp11_dynamic_routing.config import get_config
-from experiments.exp11
-
-_dynamic_routing.models import create_model
-from data.loader import load_and_cache_data
+from experiments.exp11_dynamic_routing.models import create_model
+from data.loader import quick_dataset
 from utils.helpers import set_seed
 from torch.utils.data import DataLoader
+
+
+
+
+
+def load_and_cache_data(data_config, experiment_config=None):
+    import pickle
+    from datasets import load_dataset
+    from transformers import AutoTokenizer
+    from pathlib import Path
+    
+    # Check cache first
+    cache_dir = Path(__file__).parent / ".cache"
+    cache_dir.mkdir(exist_ok=True)
+    cache_file = cache_dir / "tokens_cache.pkl"
+    
+    # For small experiments, we only need ~10M tokens (allows multiple epochs through data)
+    # This is much faster to load and sufficient for 1000 training steps
+    max_tokens_to_collect = 10_000_000
+    
+    if cache_file.exists():
+        print(f"Loading cached tokens from {cache_file}...")
+        with open(cache_file, 'rb') as f:
+            cached_data = pickle.load(f)
+            tokenizer = cached_data['tokenizer']
+            tokens = cached_data['tokens']
+        print(f"Loaded {len(tokens):,} cached tokens")
+        return [], tokenizer, tokens
+    
+    print(f"No cache found, collecting tokens...")
+    print(f"Target: {max_tokens_to_collect:,} tokens (cached for future runs)")
+    
+    # Setup tokenizer
+    tokenizer_name = "HuggingFaceTB/SmolLM-135M"
+    print(f"Loading tokenizer: {tokenizer_name}")
+    tokenizer = AutoTokenizer.from_pretrained(tokenizer_name)
+    if tokenizer.pad_token is None:
+        tokenizer.pad_token = tokenizer.eos_token
+
+    # Load dataset in streaming mode
+    print("Loading dataset (streaming)...")
+    dataset = load_dataset(
+        "HuggingFaceTB/smollm-corpus",
+        "cosmopedia-v2",
+        split="train",
+        streaming=True
+    )
+    
+    print("Collecting tokens...")
+    tokens = []
+    
+    # Iterate and tokenize
+    for i, item in enumerate(dataset):
+        text = item['text']
+        batch_tokens = tokenizer(text, add_special_tokens=True, truncation=False)['input_ids']
+        tokens.extend(batch_tokens)
+        
+        if len(tokens) >= max_tokens_to_collect:
+            break
+            
+        if i % 100 == 0:
+            print(f"  Collected {len(tokens):,} / {max_tokens_to_collect:,} tokens...", end='\r')
+            
+    tokens = tokens[:max_tokens_to_collect]
+    print(f"\nCollected {len(tokens):,} tokens")
+    
+    # Save to cache
+    print(f"Saving to cache: {cache_file}")
+    with open(cache_file, 'wb') as f:
+        pickle.dump({'tokenizer': tokenizer, 'tokens': tokens}, f)
+    print("✓ Cached for future runs")
+    
+    return [], tokenizer, tokens
+
+
 
 
 class Trainer:
@@ -317,7 +390,7 @@ def main():
         vocab_size: int = config.vocab_size
     
     data_config = DataConfig()
-    texts, tokenizer, tokens = load_and_cache_data(data_config)
+    texts, tokenizer, tokens = load_and_cache_data(data_config, config)
     config.vocab_size = len(tokenizer)
     
     print(f"Vocabulary size: {config.vocab_size}")
