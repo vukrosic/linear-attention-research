@@ -13,7 +13,7 @@
     "load_balance_alpha": 0.01
   },
   "results": {
-    "total_time": 9.325299501419067,
-    "best_val_loss": 7.600661637799365
+    "total_time": 9.946402549743652,
+    "best_val_loss": 7.600689035007331
   }
 }

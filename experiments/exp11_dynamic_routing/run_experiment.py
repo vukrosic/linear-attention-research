@@ -23,6 +23,7 @@ from pathlib import Path
 import matplotlib.pyplot as plt
 import matplotlib
 matplotlib.use('Agg')
+import numpy as np
 
 # Fix tokenizer parallelism warning
 os.environ['TOKENIZERS_PARALLELISM'] = 'false'
@@ -479,10 +480,130 @@ def main():
         },
     }
     
+    
     with open(results_dir / 'training_results.json', 'w') as f:
         json.dump(results_summary, f, indent=2)
     
+    # Save detailed history
+    with open(results_dir / 'train_history.json', 'w') as f:
+        json.dump(results['train_history'], f, indent=2)
+    
+    with open(results_dir / 'val_history.json', 'w') as f:
+        json.dump(results['val_history'], f, indent=2)
+    
     print(f"\nResults saved to: {results_dir / 'training_results.json'}")
+    
+    # Create visualizations for dynamic routing
+    if config.use_dynamic_routing and results['val_history']:
+        print("\n" + "="*70)
+        print("Creating Routing Visualizations")
+        print("="*70)
+        
+        # Extract routing data
+        steps = []
+        layer_1_gdn = []
+        layer_1_attn = []
+        layer_2_gdn = []
+        layer_2_attn = []
+        
+        for entry in results['val_history']:
+            if 'layer_1_gdn_pct' in entry:
+                steps.append(entry['step'])
+                layer_1_gdn.append(entry['layer_1_gdn_pct'])
+                layer_1_attn.append(entry['layer_1_attn_pct'])
+                layer_2_gdn.append(entry['layer_2_gdn_pct'])
+                layer_2_attn.append(entry['layer_2_attn_pct'])
+        
+        if steps:
+            # Figure 1: Layer Selection Over Time (Stacked Area)
+            fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(12, 8))
+            
+            # Layer 1
+            ax1.fill_between(steps, 0, layer_1_gdn, alpha=0.6, color='#2E86AB', label='GDN')
+            ax1.fill_between(steps, layer_1_gdn, 100, alpha=0.6, color='#A23B72', label='Softmax Attn')
+            ax1.set_ylabel('Percentage (%)', fontsize=12, fontweight='bold')
+            ax1.set_title('Layer 1 Routing: Per-Token Selection', fontsize=14, fontweight='bold')
+            ax1.legend(loc='upper right', fontsize=11)
+            ax1.grid(True, alpha=0.3)
+            ax1.set_ylim(0, 100)
+            
+            # Layer 2
+            ax2.fill_between(steps, 0, layer_2_gdn, alpha=0.6, color='#2E86AB', label='GDN')
+            ax2.fill_between(steps, layer_2_gdn, 100, alpha=0.6, color='#A23B72', label='Softmax Attn')
+            ax2.set_xlabel('Training Step', fontsize=12, fontweight='bold')
+            ax2.set_ylabel('Percentage (%)', fontsize=12, fontweight='bold')
+            ax2.set_title('Layer 2 Routing: Per-Token Selection', fontsize=14, fontweight='bold')
+            ax2.legend(loc='upper right', fontsize=11)
+            ax2.grid(True, alpha=0.3)
+            ax2.set_ylim(0, 100)
+            
+            plt.tight_layout()
+            routing_plot_path = results_dir / 'layer_selection_over_time.png'
+            plt.savefig(routing_plot_path, dpi=300, bbox_inches='tight')
+            print(f"✓ Saved: {routing_plot_path}")
+            plt.close()
+            
+            # Figure 2: Comparative Line Plot
+            fig, ax = plt.subplots(figsize=(12, 6))
+            ax.plot(steps, layer_1_gdn, marker='o', linewidth=2.5, color='#2E86AB', 
+                   label='Layer 1: GDN %', markersize=6)
+            ax.plot(steps, layer_2_gdn, marker='s', linewidth=2.5, color='#F18F01', 
+                   label='Layer 2: GDN %', markersize=6)
+            ax.axhline(y=50, color='gray', linestyle='--', alpha=0.5, label='Balanced (50%)')
+            
+            ax.set_xlabel('Training Step', fontsize=12, fontweight='bold')
+            ax.set_ylabel('GDN Selection Percentage (%)', fontsize=12, fontweight='bold')
+            ax.set_title('Dynamic Routing: GDN Preference Across Layers', fontsize=14, fontweight='bold')
+            ax.legend(loc='best', fontsize=11)
+            ax.grid(True, alpha=0.3)
+            ax.set_ylim(0, 100)
+            
+            plt.tight_layout()
+            comparison_plot_path = results_dir / 'routing_comparison.png'
+            plt.savefig(comparison_plot_path, dpi=300, bbox_inches='tight')
+            print(f"✓ Saved: {comparison_plot_path}")
+            plt.close()
+            
+            # Figure 3: Final routing distribution (for paper)
+            if len(steps) > 0:
+                final_step_idx = -1
+                final_data = {
+                    'Layer 1': [layer_1_gdn[final_step_idx], layer_1_attn[final_step_idx]],
+                    'Layer 2': [layer_2_gdn[final_step_idx], layer_2_attn[final_step_idx]]
+                }
+                
+                fig, ax = plt.subplots(figsize=(10, 6))
+                x = np.arange(len(final_data))
+                width = 0.35
+                
+                gdn_bars = ax.bar(x - width/2, [d[0] for d in final_data.values()], 
+                                 width, label='GDN', color='#2E86AB', alpha=0.8)
+                attn_bars = ax.bar(x + width/2, [d[1] for d in final_data.values()], 
+                                  width, label='Softmax Attn', color='#A23B72', alpha=0.8)
+                
+                ax.set_ylabel('Percentage (%)', fontsize=12, fontweight='bold')
+                ax.set_title(f'Final Routing Distribution (Step {steps[final_step_idx]})', 
+                           fontsize=14, fontweight='bold')
+                ax.set_xticks(x)
+                ax.set_xticklabels(final_data.keys(), fontsize=11)
+                ax.legend(fontsize=11)
+                ax.grid(True, alpha=0.3, axis='y')
+                ax.set_ylim(0, 100)
+                
+                # Add percentage labels on bars
+                for bars in [gdn_bars, attn_bars]:
+                    for bar in bars:
+                        height = bar.get_height()
+                        ax.text(bar.get_x() + bar.get_width()/2., height,
+                               f'{height:.1f}%', ha='center', va='bottom', fontsize=10)
+                
+                plt.tight_layout()
+                final_dist_path = results_dir / 'final_routing_distribution.png'
+                plt.savefig(final_dist_path, dpi=300, bbox_inches='tight')
+                print(f"✓ Saved: {final_dist_path}")
+                plt.close()
+                
+            print("="*70)
     
     print("\n" + "="*70)
     print("✅ EXPERIMENT COMPLETED!")
