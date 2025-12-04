@@ -51,7 +51,7 @@ This paper proposes a dynamic routing mechanism that selects between linear ($O(
 
 \section{Introduction}
 
-The core inefficiency of Large Language Models lies in treating every token with the same computational budget. ``The cat sat on the...'' requires less reasoning than a complex logic puzzle, yet standard Transformers spend $O(n^2)$ attention on both. Linear attention mechanisms (like Gated DeltaNet) offer $O(n)$ speed but often degrade performance compared to full attention.
+The core inefficiency of Large Language Models lies in treating every token with the same computational budget. ``The cat sat on the...'' requires less reasoning than a complex logic puzzle, yet standard Transformers spend $O(n^2)$ attention on both~\cite{vaswani2017attention}. Linear attention mechanisms~\cite{katharopoulos2020transformers} (like Gated DeltaNet~\cite{yang2024gated}) offer $O(n)$ speed but often degrade performance compared to full attention.
 
 We hypothesize that a ``best of both worlds'' architecture exists: a model that dynamically routes tokens to the most appropriate attention mechanism.
 \begin{itemize}
@@ -77,9 +77,9 @@ A lightweight 4-layer architecture is used to test the routing mechanism:
 \end{figure}
 
 \subsection{Parallel Routing \& Load Balancing}
-To simplify the implementation, \textbf{parallel routing} is used: the router computes decisions for all routed layers simultaneously after Layer 0. A \textbf{Gumbel-Softmax} distribution is used to make the discrete routing decisions differentiable during training. This technique relaxes the discrete sampling process into a continuous, differentiable approximation, allowing gradients to flow through the routing decisions during backpropagation.
+To simplify the implementation, \textbf{parallel routing} is used: the router computes decisions for all routed layers simultaneously after Layer 0. A \textbf{Gumbel-Softmax}~\cite{jang2016categorical} distribution is used to make the discrete routing decisions differentiable during training. This technique relaxes the discrete sampling process into a continuous, differentiable approximation, allowing gradients to flow through the routing decisions during backpropagation.
 
-A critical challenge is \textbf{routing collapse}, where the model defaults to 100\% usage of one mechanism (a layer learns more because it's chosen more - starting a vicious cycle). To counter this, we apply a load balancing loss adapted from the \textbf{Switch Transformer}.
+A critical challenge is \textbf{routing collapse}, where the model defaults to 100\% usage of one mechanism (a layer learns more because it's chosen more - starting a vicious cycle). To counter this, we apply a load balancing loss adapted from the \textbf{Switch Transformer}~\cite{fedus2022switch}.
 
 \subsubsection{The Math: Measuring Balance}
 We track two metrics for our $N=2$ experts:
@@ -129,7 +129,7 @@ A controlled experiment was conducted to validate the stability and performance 
 \textbf{Setup:}
 \begin{itemize}
     \item \textbf{Model Size:} $\sim$160M parameters
-    \item \textbf{Data:} SmolLm Corpus (Cosmopedia v2)
+    \item \textbf{Data:} SmolLm Corpus (Cosmopedia v2)~\cite{benallal2024smollm}
     \item \textbf{Training:} 1500 steps
     \item \textbf{Load Balancing:} $\alpha=0.5$ (aggressive balancing to prevent routing collapse)
     \item \textbf{Comparison:} 
@@ -249,5 +249,8 @@ While this proof-of-concept demonstrates the feasibility of learned routing, sev
     
     \item \textbf{Token-type analysis:} A systematic analysis of which syntactic and semantic categories (nouns, verbs, function words, named entities) prefer which attention mechanisms could reveal linguistic insights and guide architectural improvements.
 \end{enumerate}
+
+\bibliographystyle{plain}
+\bibliography{references}
 
 \end{document}
