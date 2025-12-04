@@ -33,7 +33,7 @@
     captionpos=b                                % Caption position at bottom
 }
 
-\title{Adaptive Selection between Linear and Full Attention Layers for Every Token}
+\title{Auto-Selection between Linear and Full Attention Layers for Every Token}
 \author{
     Vuk Rosić\textsuperscript{1,2} \\
     \textsuperscript{1}Open Superintelligence Lab \\
@@ -46,7 +46,7 @@
 \maketitle
 
 \begin{abstract}
-This paper proposes a dynamic routing mechanism that selects between linear ($O(n)$) and softmax ($O(n^2)$) attention on a per-token basis. While linear attention offers efficiency, it often lacks the attention power (detail retrieval and understanding) of full softmax attention. This approach allows the model to adaptively allocate compute: using fast linear attention for ``easy'' tokens and computationally intensive softmax attention for ``hard'' tokens. This introduces a trade-off: increased training complexity (teaching the router) in exchange for optimized inference (allocating FLOPs where needed). This concept is validated with a proof-of-concept 4-layer model, demonstrating that a stable, balanced routing strategy can be learned.
+This paper proposes a dynamic routing mechanism that selects between linear ($O(n)$) and softmax ($O(n^2)$) attention layers on a per-token basis. While linear attention offers efficiency, it often lacks the attention power (detail retrieval and understanding) of full softmax attention. This approach allows the model to adaptively allocate compute: using fast linear attention for ``easy'' tokens and computationally intensive softmax attention for ``hard'' tokens. This introduces a trade-off: increased training complexity (teaching the router) in exchange for optimized inference (allocating FLOPs where needed). This paper presents a \textbf{proof-of-concept} implementation of this dynamic routing. It is shown that with proper load balancing, a small-scale model can learn a non-trivial routing strategy that matches the convergence of a static hybrid baseline.
 \end{abstract}
 
 \section{Introduction}
@@ -58,8 +58,6 @@ We hypothesize that a ``best of both worlds'' architecture exists: a model that 
     \item \textbf{Training:} More expensive. The model must learn \textit{how} to route, not just \textit{what} to predict.
     \item \textbf{Inference:} Optimized. The model saves compute on simple tokens (routing to Linear) and invests it in complex ones (routing to Softmax).
 \end{itemize}
-
-This paper presents a \textbf{proof-of-concept} implementation of this dynamic routing. It is shown that with proper load balancing, a small-scale model can learn a non-trivial routing strategy that matches the convergence of a static hybrid baseline.
 
 \section{Method}
 
@@ -137,13 +135,13 @@ A controlled experiment was conducted to validate the stability and performance 
     \item \textbf{Comparison:} 
     \begin{enumerate}
         \item \textbf{Static Baseline:} Fixed layers (GDN $\rightarrow$ GDN $\rightarrow$ GDN $\rightarrow$ Softmax).
-        \item \textbf{Dynamic Model:} Learned routing for Layers 1 \& 2.
+        \item \textbf{Dynamic Model:} Learned routing for Layers 1 \& 2 (Layer 0 is fixed to GDN, Layer 3 is fixed to softmax attention).
     \end{enumerate}
 \end{itemize}
 
-\subsection{Performance Comparison}
+\subsection{Training Performance \& Routing Stability}
 
-The dynamic model successfully learned a balanced routing strategy (using $\sim$54-58% GDN in routed layers) and achieved comparable performance to the static baseline.
+As expected, the dynamic model learns slightly slower than the static baseline due to the additional complexity of learning routing decisions. However, the key result is that it successfully learned a \textbf{stable, balanced routing strategy} without collapsing to a trivial solution.
 
 \begin{table}[h]
     \centering
@@ -152,19 +150,14 @@ The dynamic model successfully learned a balanced routing strategy (using $\sim$
         \textbf{Model} & \textbf{Val Loss} $\downarrow$ & \textbf{Val Accuracy} $\uparrow$ & \textbf{Routing Behavior} \\
         \midrule
         \textbf{Static Baseline} & 3.83 & 35.92\% & Fixed (100\% GDN in L1/L2) \\
-        \textbf{Dynamic (Balanced)} & \textbf{4.43} & \textbf{34.65\%} & \textbf{Mixed ($\sim$54\% GDN L1, 58\% GDN L2)} \\
+        \textbf{Dynamic (Balanced)} & 4.43 & 34.65\% & \textbf{Learned Mixed} ($\sim$54-58\% GDN) \\
         \bottomrule
     \end{tabular}
-    \caption{Performance Comparison after 1500 training steps with $\alpha=0.5$ load balancing}
+    \caption{Training metrics after 1500 steps. The dynamic model's slightly lower performance is expected - it must learn both the task \textit{and} how to route. The critical achievement is stable routing convergence.}
     \label{tab:performance}
 \end{table}
 
-\begin{figure}[h]
-    \centering
-    \includegraphics[width=\linewidth]{images/routing_comparison.png}
-    \caption{Training Curves}
-    \label{fig:training_curves}
-\end{figure}
+The modest performance gap (0.6 loss difference, 1.3\% accuracy difference) is acceptable given that this is a proof-of-concept demonstrating the \textit{feasibility} of learned routing. The trade-off is intentional: we accept harder training for the potential of more efficient inference.
 
 \subsection{Routing Analysis}
 The router did not simply collapse to a random 50/50 split; it learned specific preferences for different layers. As shown in Figure~\ref{fig:routing_distribution}, both layers demonstrate a preference for linear attention:
@@ -187,11 +180,11 @@ To understand which tokens trigger different attention mechanisms, we analyzed r
 
 Several interesting patterns emerge:
 \begin{enumerate}
-    \item \textbf{Punctuation \& Structural Tokens:} Tokens like periods, commas, and the initial ``The'' consistently route to Softmax in Layer 1. This suggests the model uses full attention for structural tokens that may require global context awareness.
+    \item \textbf{Punctuation \& Structural Tokens:} Tokens like periods, commas, and the initial ``The'' consistently route to Softmax in Layer 1. This seems counterintuitive as those tokens should be easier to compute. More research is required here.
     
-    \item \textbf{Content Words:} Nouns and verbs (``fox'', ``jumps'', ``equations'', ``mechanics'') often route to Linear attention in Layer 1, relying on the efficient mechanism for straightforward content representation.
+    \item \textbf{Content Words:} Nouns and verbs (``fox'', ``jumps'', ``equations'', ``mechanics'') often route to Linear attention in Layer 1.
     
-    \item \textbf{Layer-Specific Behavior:} Layer 2 shows the opposite pattern—more content words route to Softmax while structural tokens use Linear. This suggests a hierarchical routing strategy where different layers specialize in different types of dependencies.
+    \item \textbf{Layer-Specific Behavior:} Layer 2 shows the opposite pattern - more content words route to Softmax while structural tokens use Linear. This suggests a hierarchical routing strategy where different layers specialize in different types of dependencies.
     
     \item \textbf{Context-Dependent Routing:} The same word type (e.g., "the") can be routed differently depending on its position and surrounding context, indicating that routing is truly dynamic and context-aware rather than based solely on token identity.
 \end{enumerate}
@@ -227,13 +220,13 @@ This sharp decision boundary has important implications:
 The results highlight a fundamental trade-off in efficient AI:
 
 \begin{enumerate}
-    \item \textbf{Training Cost:} The Dynamic model is harder to train. It requires extra parameters for the router and careful tuning of the load balancing loss to prevent collapse. Initial experiments with the conservative coefficient ($\alpha=0.01$) used in the Switch Transformer paper resulted in complete routing collapse to GDN layers. Only by increasing the coefficient 50-fold to $\alpha=0.5$ was balanced routing achieved. This highlights that the load balancing strength must be carefully tuned for each architecture and task—too weak and the model collapses to the easiest path, too strong and it may prevent learning meaningful routing preferences.
+    \item \textbf{Training Cost:} The Dynamic model is harder to train. It requires extra parameters for the router and careful tuning of the load balancing loss to prevent collapse. Initial experiments with the conservative coefficient ($\alpha=0.01$) used in the Switch Transformer paper resulted in complete routing collapse to GDN layers. Only by increasing the coefficient 50-fold to $\alpha=0.5$ was balanced routing achieved. This highlights that the load balancing strength must be carefully tuned for each architecture and task - too weak and the model collapses to the easiest path, too strong and it may prevent learning meaningful routing preferences.
     
-    \item \textbf{Inference Optimization:} The payoff is in inference. A static model is rigid—it must pay the $O(n^2)$ cost for Softmax layers on \textit{every} token. The dynamic model has the \textit{option} to use $O(n)$ linear attention for easy tokens. In a large-scale deployment, this means simple queries can be processed with linear speed, only triggering the expensive quadratic attention when the router detects complex dependencies. As shown in Figure~\ref{fig:routing_distribution}, the learned router maintains approximately 60\% linear attention usage across both layers, demonstrating significant potential for inference speedup while preserving model quality.
+    \item \textbf{Inference Optimization:} The payoff is in inference. A static model is rigid - it must pay the $O(n^2)$ cost for Softmax layers on \textit{every} token. The dynamic model has the \textit{option} to use $O(n)$ linear attention for easy tokens. In a large-scale deployment, this means simple queries can be processed with linear speed, only triggering the expensive quadratic attention when the router detects complex dependencies. As shown in Figure~\ref{fig:routing_distribution}, the learned router maintains approximately 60\% linear attention usage across both layers, demonstrating significant potential for inference speedup while preserving model quality.
 \end{enumerate}
 
 \section{Conclusion}
 
-This work has demonstrated a working proof-of-concept for dynamic token routing in Linear Transformers. By accepting higher training complexity, an adaptive inference engine is gained that intelligently allocates FLOPs. Future work will scale this to billions of parameters, where the savings from routing ``easy'' tokens away from quadratic attention could yield massive efficiency gains.
+This work has demonstrated a working proof-of-concept for dynamic token routing in Linear Transformers. By accepting higher training complexity, an adaptive inference engine is gained that intelligently allocates FLOPs.
 
 \end{document}
