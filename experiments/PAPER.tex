@@ -20,7 +20,7 @@
     language=Python
 }
 
-\title{Adaptive Attention Selection: A Proof-of-Concept for Dynamic Routing in Linear Transformers}
+\title{Adaptive Selection between Linear and Full Attention Layers for Every Token}
 \author{}
 \date{}
 
@@ -56,7 +56,7 @@ A lightweight 4-layer architecture is used to test the routing mechanism:
 
 \begin{figure}[h]
     \centering
-    \includegraphics[width=\linewidth]{architecture.png}
+    \includegraphics[width=\linewidth]{images/architecture.png}
     \caption{Architecture Diagram}
     \label{fig:architecture}
 \end{figure}
@@ -69,11 +69,11 @@ A critical challenge is \textbf{routing collapse}, where the model defaults to 1
 \subsubsection{The Math: Measuring Balance}
 We track two metrics for our $N=2$ experts:
 \begin{enumerate}
-    \item \textbf{$f$ (The Actual Workload):} What fraction of tokens did we \textit{actually} assign to each expert?
+    \item \textbf{$f$:} What fraction of tokens did we \textit{actually} assign to each expert?
     \begin{itemize}
         \item \textit{Example:} If we have 100 tokens and send 90 to Linear, $f = [0.9, 0.1]$.
     \end{itemize}
-    \item \textbf{$P$ (The Manager's Bias):} What was the average probability (confidence) the router had for each expert?
+    \item \textbf{$P$:} What was the average probability (confidence) the router had for each expert?
     \begin{itemize}
         \item \textit{Example:} If the router was generally 90\% sure about Linear, $P = [0.9, 0.1]$.
     \end{itemize}
@@ -141,7 +141,7 @@ The dynamic model successfully learned a balanced routing strategy (using $\sim$
 
 \begin{figure}[h]
     \centering
-    \includegraphics[width=\linewidth]{results_dynamic/routing_comparison.png}
+    \includegraphics[width=\linewidth]{images/routing_comparison.png}
     \caption{Training Curves}
     \label{fig:training_curves}
 \end{figure}
@@ -157,7 +157,7 @@ This confirms the hypothesis: the model \textit{can} learn to allocate different
 
 \begin{figure}[h]
     \centering
-    \includegraphics[width=\linewidth]{results_dynamic/layer_selection_over_time.png}
+    \includegraphics[width=\linewidth]{images/layer_selection_over_time.png}
     \caption{Routing Distribution Over Time}
     \label{fig:routing_dist}
 \end{figure}
@@ -174,7 +174,7 @@ The results highlight a fundamental trade-off in efficient AI:
 
 \begin{figure}[h]
     \centering
-    \includegraphics[width=\linewidth]{results_dynamic/final_routing_distribution.png}
+    \includegraphics[width=\linewidth]{images/final_routing_distribution.png}
     \caption{Final Routing Distribution}
     \label{fig:final_routing}
 \end{figure}
