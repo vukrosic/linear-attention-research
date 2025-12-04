@@ -70,6 +70,7 @@ Fork this repository, create a new experiment in `experiments/` folder, then cre
 
 1. **Fork this repository** - Click the "Fork" button at the top right of this page to create your own copy
 2. Clone your fork: `git clone --recursive https://github.com/vukrosic/linear-attention-research.git`
+   - **If you forgot `--recursive`**: Run `git submodule update --init --recursive` to initialize the submodules
 3. Install dependencies: `pip install -r requirements.txt`
 4. Read `CONTRIBUTING.md` for contribution guidelines
 5. Create your own experiment and merge it

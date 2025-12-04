@@ -1,4 +1,4 @@
-flash-attn --no-build-isolation
+# flash-attn --no-build-isolation
 datasets
 transformers
 einops
