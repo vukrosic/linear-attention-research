@@ -32,7 +32,11 @@ A lightweight 4-layer architecture is used to test the routing mechanism:
 ### 2.2 Parallel Routing & Load Balancing
 To simplify the implementation, **parallel routing** is used: the router computes decisions for all routed layers simultaneously after Layer 0. A **Gumbel-Softmax** distribution is used to make the discrete routing decisions differentiable during training. This technique relaxes the discrete sampling process into a continuous, differentiable approximation, allowing gradients to flow through the routing decisions during backpropagation.
 
-A critical challenge is **routing collapse**, where the model defaults to 100% usage of one mechanism (a layer learns more because it's choosen more - starting a vicious cycle). To counter this, a load balancing loss is applied (similar to Mixture-of-Experts) that penalizes the model if it deviates significantly from a target distribution (e.g., 50/50).
+A critical challenge is **routing collapse**, where the model defaults to 100% usage of one mechanism (a layer learns more because it's choosen more - starting a vicious cycle). To counter this, we apply a load balancing loss adapted from the **Switch Transformer**.
+
+This auxiliary loss minimizes the dot product between the fraction of tokens routed to each expert ($f_i$) and the average router probability for that expert ($P_i$):
+$$ \mathcal{L}_{balance} = N \cdot \sum_{i=1}^{N} f_i \cdot P_i $$
+where $N=2$ is the number of choices. This objective is minimized when both the routing decisions and the router's probabilities are uniformly distributed, effectively preventing the router from ignoring one path. (See **Appendix A** for a detailed derivation and explanation).
 
 ---
 
@@ -86,3 +90,80 @@ The results highlight a fundamental trade-off in efficient AI:
 ## 5. Conclusion
 
 This work has demonstrated a working proof-of-concept for dynamic token routing in Linear Transformers. By accepting higher training complexity, an adaptive inference engine is gained that intelligently allocates FLOPs. Future work will scale this to billions of parameters, where the savings from routing "easy" tokens away from quadratic attention could yield massive efficiency gains.
+
+---
+
+## Appendix A: Tutorial - Understanding & Implementing Load Balancing
+
+This tutorial breaks down the "Load Balancing Loss" used in this paper, moving from high-level intuition to the actual PyTorch implementation.
+
+### Level 1: The Intuition (Why do we need this?)
+Imagine you have two employees: **Alice (Linear Attention)** and **Bob (Softmax Attention)**.
+-   **Alice** is fast but not very detailed.
+-   **Bob** is slow but extremely thorough.
+
+You are the **Manager (Router)**. Your goal is to send easy tasks to Alice and hard tasks to Bob.
+**The Problem:** When you start, you don't know who is better at what. If you randomly send 60% of tasks to Alice, she gets practice and improves. Bob sits idle and doesn't learn. Next time, you see Alice is doing okay, so you send her 70%. Eventually, you send **100% of tasks to Alice**. Bob never learned anything, and now you're stuck with a "collapsed" team where the expert (Bob) is wasted.
+
+**The Solution:** You need a rule from HR: *"You must assign a fair share of work to both employees so they both stay trained."* This is the **Load Balancing Loss**.
+
+### Level 2: The Math (How do we measure balance?)
+We track two metrics for our $N=2$ experts:
+1.  **$f$ (The Actual Workload):** What fraction of tokens did we *actually* assign to each expert?
+    *   *Example:* If we have 100 tokens and send 90 to Linear, $f = [0.9, 0.1]$.
+2.  **$P$ (The Manager's Bias):** What was the average probability (confidence) the router had for each expert?
+    *   *Example:* If the router was generally 90% sure about Linear, $P = [0.9, 0.1]$.
+
+We want both vectors to be close to uniform ($[0.5, 0.5]$). The Switch Transformer paper defines the loss as the scaled dot product:
+$$ \mathcal{L} = N \cdot \sum_{i=1}^{N} f_i \cdot P_i $$
+
+*   **Balanced Case:** $f=[0.5, 0.5], P=[0.5, 0.5]$. Loss $= 2 \cdot (0.25 + 0.25) = \mathbf{1.0}$. (Minimum)
+*   **Collapsed Case:** $f=[1.0, 0.0], P=[1.0, 0.0]$. Loss $= 2 \cdot (1.0 + 0.0) = \mathbf{2.0}$. (Maximum)
+
+### Level 3: The Code (PyTorch Implementation)
+Here is the actual implementation from `models.py`. We calculate this loss for every routed layer.
+
+```python
+def compute_load_balancing_loss(self, router_probs_list):
+    """
+    Computes auxiliary load balancing loss.
+    Args:
+        router_probs_list: List of probability tensors [batch, seq, experts]
+    """
+    total_loss = 0.0
+    num_experts = 2  # Linear vs Softmax
+    
+    for router_probs in router_probs_list:
+        # 1. Calculate 'f': Fraction of tokens actually routed to each expert
+        # We use argmax to find the hard decision (which expert won?)
+        expert_mask = F.one_hot(router_probs.argmax(dim=-1), num_classes=num_experts).float()
+        fraction_per_expert = expert_mask.mean(dim=[0, 1]) # Average over batch & seq
+        
+        # 2. Calculate 'P': Average probability assigned to each expert
+        avg_prob_per_expert = router_probs.mean(dim=[0, 1])
+        
+        # 3. Compute dot product loss
+        # We multiply by num_experts so the ideal loss is always 1.0
+        layer_loss = num_experts * (fraction_per_expert * avg_prob_per_expert).sum()
+        total_loss += layer_loss
+    
+    return total_loss / len(router_probs_list)
+```
+
+### Level 4: Integration (The Training Loop)
+Finally, we add this auxiliary loss to our main objective. We use a small coefficient ($\alpha=0.01$) so it doesn't overpower the main goal of predicting the next token.
+
+```python
+# 1. Calculate standard language modeling loss
+lm_loss = F.cross_entropy(logits, labels)
+
+# 2. Calculate load balancing loss
+aux_loss = self.compute_load_balancing_loss([
+    router_probs_layer_1,
+    router_probs_layer_2
+])
+
+# 3. Combine them
+# alpha=0.01 ensures we just nudge the router, not force it
+loss = lm_loss + 0.01 * aux_loss
+```
