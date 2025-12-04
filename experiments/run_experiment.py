@@ -360,7 +360,7 @@ def main():
     """Main experiment function"""
     parser = argparse.ArgumentParser(description='Train Dynamic Routing vs Baseline')
     parser.add_argument('--config', type=str, default='baseline',
-                        choices=['baseline', 'dynamic', 'dynamic_aggressive'],
+                        choices=['baseline', 'dynamic'],
                         help='Config to use (baseline or dynamic)')
     parser.add_argument('--resume', type=str, default=None,
                         help='Path to checkpoint to resume from')

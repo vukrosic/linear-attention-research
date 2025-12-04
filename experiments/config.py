@@ -36,7 +36,7 @@ class ExperimentConfig:
     fixed_attn_layers: List[int] = None  # Which layers always use Softmax (e.g., [3])
     
     # Load Balancing
-    load_balance_alpha: float = 0.01  # Weight for load balancing loss
+    load_balance_alpha: float = 0.5  # Weight for load balancing loss
     
     # Gumbel-Softmax
     gumbel_temperature: float = 1.0  # Temperature for Gumbel-Softmax sampling
@@ -182,7 +182,7 @@ def get_dynamic_config():
         fixed_attn_layers=[3],  # Layer 3 always Softmax
         
         # Load balancing to prevent collapse
-        load_balance_alpha=0.01,  # Start conservative, increase if collapse happens
+        load_balance_alpha=0.5,  # Aggressive coefficient needed to prevent routing collapse
         
         # Gumbel-Softmax configuration
         gumbel_temperature=1.0,
@@ -213,23 +213,13 @@ def get_dynamic_config():
     )
 
 
-def get_dynamic_aggressive_balance_config():
-    """
-    Same as dynamic but with stronger load balancing
-    Use this if routing collapses with default config
-    """
-    config = get_dynamic_config()
-    config.load_balance_alpha = 0.5  # 50x stronger (was 0.01)
-    config.min_temperature = 1.0     # Keep temperature high to force exploration
-    config.checkpoint_dir = "checkpoints_dynamic_aggressive"
-    return config
+
 
 
 # Config registry
 CONFIGS = {
     'baseline': get_baseline_config,
     'dynamic': get_dynamic_config,
-    'dynamic_aggressive': get_dynamic_aggressive_balance_config,
 }
 
 
