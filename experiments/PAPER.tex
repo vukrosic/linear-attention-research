@@ -92,7 +92,9 @@ We want both vectors to be close to uniform ($[0.5, 0.5]$). The Switch Transform
 \end{itemize}
 
 \subsubsection{Integration into Training}
-This auxiliary loss is added to the main objective with a small coefficient ($\alpha=0.01$) so it doesn't overpower the main goal of predicting the next token.
+This auxiliary loss is added to the main objective with coefficient $\alpha$. Initially, we attempted a conservative value ($\alpha=0.01$) following the Switch Transformer paper's recommendations. However, this resulted in \textbf{routing collapse}, where the model defaulted entirely to GDN layers, never learning to use the more expensive Softmax attention.
+
+To address this, we significantly increased the load balancing strength to $\alpha=0.5$. This more aggressive coefficient forces the router to maintain balanced usage, preventing the collapse while still allowing the model to learn meaningful routing preferences.
 
 \begin{lstlisting}[language=Python]
 # 1. Calculate standard language modeling loss
@@ -105,8 +107,8 @@ aux_loss = self.compute_load_balancing_loss([
 ])
 
 # 3. Combine them
-# alpha=0.01 ensures we just nudge the router, not force it
-loss = lm_loss + 0.01 * aux_loss
+# alpha=0.5 prevents routing collapse (0.01 was too weak)
+loss = lm_loss + 0.5 * aux_loss
 \end{lstlisting}
 
 \section{Experiments \& Results}
@@ -171,7 +173,7 @@ This confirms the hypothesis: the model \textit{can} learn to allocate different
 The results highlight a fundamental trade-off in efficient AI:
 
 \begin{enumerate}
-    \item \textbf{Training Cost:} The Dynamic model is harder to train. It requires extra parameters for the router and careful tuning of the load balancing loss to prevent collapse. It was observed that without this loss, the model greedily collapses to the ``easiest'' path (pure GDN), missing out on the benefits of hybrid attention.
+    \item \textbf{Training Cost:} The Dynamic model is harder to train. It requires extra parameters for the router and careful tuning of the load balancing loss to prevent collapse. Initial experiments with the conservative coefficient ($\alpha=0.01$) used in the Switch Transformer paper resulted in complete routing collapse to GDN layers. Only by increasing the coefficient 50-fold to $\alpha=0.5$ was balanced routing achieved. This highlights that the load balancing strength must be carefully tuned for each architecture and task—too weak and the model collapses to the easiest path, too strong and it may prevent learning meaningful routing preferences.
     
     \item \textbf{Inference Optimization:} The payoff is in inference. A static model is rigid—it must pay the $O(n^2)$ cost for Softmax layers on \textit{every} token. The dynamic model has the \textit{option} to use $O(n)$ linear attention for easy tokens. In a large-scale deployment, this means simple queries can be processed with linear speed, only triggering the expensive quadratic attention when the router detects complex dependencies.
 \end{enumerate}
