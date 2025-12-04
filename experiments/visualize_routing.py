@@ -7,11 +7,11 @@ import sys
 from termcolor import colored
 
 # Add root to path
-root_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+root_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, root_dir)
 
-from experiments.exp11_dynamic_routing.models import create_model
-from experiments.exp11_dynamic_routing.config import get_config
+from experiments.models import create_model
+from experiments.config import get_config
 
 def get_color(is_softmax):
     # Softmax = Red (Complex/Expensive)
