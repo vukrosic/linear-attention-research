@@ -38,9 +38,9 @@ This paper proposes a dynamic routing mechanism that selects between linear ($O(
 
 \section{Introduction}
 
-The core inefficiency of Large Language Models lies in treating every token with the same computational budget. ``The cat sat on the...'' requires less reasoning than a complex logic puzzle, yet standard Transformers spend $O(n^2)$ attention on both. Linear attention mechanisms (like Gated DeltaNet) offer $O(n)$ speed but often degrade performance.
+The core inefficiency of Large Language Models lies in treating every token with the same computational budget. ``The cat sat on the...'' requires less reasoning than a complex logic puzzle, yet standard Transformers spend $O(n^2)$ attention on both. Linear attention mechanisms (like Gated DeltaNet) offer $O(n)$ speed but often degrade performance compared to full attention.
 
-It is hypothesized that a ``best of both worlds'' architecture exists: a model that dynamically routes tokens to the most appropriate attention mechanism.
+We hypothesize that a ``best of both worlds'' architecture exists: a model that dynamically routes tokens to the most appropriate attention mechanism.
 \begin{itemize}
     \item \textbf{Training:} More expensive. The model must learn \textit{how} to route, not just \textit{what} to predict.
     \item \textbf{Inference:} Optimized. The model saves compute on simple tokens (routing to Linear) and invests it in complex ones (routing to Softmax).
@@ -53,8 +53,8 @@ This paper presents a \textbf{proof-of-concept} implementation of this dynamic r
 \subsection{Architecture}
 A lightweight 4-layer architecture is used to test the routing mechanism:
 \begin{itemize}
-    \item \textbf{Layer 0 (Fixed):} Gated DeltaNet (GDN). Provides a stable linear foundation.
-    \item \textbf{Layers 1 \& 2 (Routed):} Dynamic choice between GDN and Softmax.
+    \item \textbf{Layer 0 (Fixed):} Gated DeltaNet (GDN). Provides a stable input.
+    \item \textbf{Layers 1 \& 2 (Routed):} Dynamic choice between GDN (for easy tokens) and Softmax (for difficult tokens).
     \item \textbf{Layer 3 (Fixed):} Softmax. Ensures global context aggregation at the end.
 \end{itemize}
 
@@ -73,11 +73,11 @@ A critical challenge is \textbf{routing collapse}, where the model defaults to 1
 \subsubsection{The Math: Measuring Balance}
 We track two metrics for our $N=2$ experts:
 \begin{enumerate}
-    \item \textbf{$f$ (The Actual Workload):} What fraction of tokens did we \textit{actually} assign to each expert?
+    \item \textbf{$f$:} What fraction of tokens did we \textit{actually} assign to each expert?
     \begin{itemize}
         \item \textit{Example:} If we have 100 tokens and send 90 to Linear, $f = [0.9, 0.1]$.
     \end{itemize}
-    \item \textbf{$P$ (The Manager's Bias):} What was the average probability (confidence) the router had for each expert?
+    \item \textbf{$P$:} What was the average probability (confidence) the router had for each expert?
     \begin{itemize}
         \item \textit{Example:} If the router was generally 90\% sure about Linear, $P = [0.9, 0.1]$.
     \end{itemize}

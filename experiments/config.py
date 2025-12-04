@@ -137,7 +137,7 @@ def get_baseline_config():
         # Training
         max_seq_len=1024,
         batch_size=16,
-        max_steps=20,
+        max_steps=1500,
         warmup_steps=5,
         learning_rate=1e-3,  # GDN prefers 1e-3
         gradient_clip=1.0,
