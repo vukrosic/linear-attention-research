@@ -137,8 +137,8 @@ def get_baseline_config():
         # Training
         max_seq_len=1024,
         batch_size=16,
-        max_steps=200,
-        warmup_steps=20,
+        max_steps=20,
+        warmup_steps=5,
         learning_rate=1e-3,  # GDN prefers 1e-3
         gradient_clip=1.0,
         
@@ -147,9 +147,9 @@ def get_baseline_config():
         max_tokens=70_000_000,
         
         # Evaluation
-        eval_interval=20,
+        eval_interval=10,
         eval_batches=10,
-        log_interval=10,
+        log_interval=5,
         
         # Checkpointing
         checkpoint_dir="checkpoints_baseline",
@@ -193,8 +193,8 @@ def get_dynamic_config():
         # Training
         max_seq_len=1024,
         batch_size=16,
-        max_steps=200,
-        warmup_steps=20,
+        max_steps=20,
+        warmup_steps=5,
         learning_rate=2e-3,  # Hybrids with attention prefer higher LR (from exp7)
         gradient_clip=1.0,
         
@@ -203,9 +203,9 @@ def get_dynamic_config():
         max_tokens=70_000_000,
         
         # Evaluation
-        eval_interval=20,
+        eval_interval=10,
         eval_batches=10,
-        log_interval=10,
+        log_interval=5,
         log_routing_stats=True,
         
         # Checkpointing
