@@ -28,14 +28,22 @@ import numpy as np
 # Fix tokenizer parallelism warning
 os.environ['TOKENIZERS_PARALLELISM'] = 'false'
 
-root_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-sys.path.insert(0, root_dir)
+# Add paths - experiments dir first (for local config/models), then root
+experiments_dir = os.path.dirname(os.path.abspath(__file__))
+root_dir = os.path.dirname(experiments_dir)
+sys.path.insert(0, experiments_dir)  # Local files first
+sys.path.insert(1, root_dir)  # Then root
 
-from experiments.exp11_dynamic_routing.config import get_config
-from experiments.exp11_dynamic_routing.models import create_model
+# Import local modules from experiments directory
+import config as exp_config
+import models as exp_models
 from data.loader import quick_dataset
 from utils.helpers import set_seed
 from torch.utils.data import DataLoader
+
+# Use the functions from our local modules
+get_config = exp_config.get_config
+create_model = exp_models.create_model
 
 
 

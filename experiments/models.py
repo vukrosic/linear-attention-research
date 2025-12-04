@@ -16,7 +16,7 @@ import torch.nn.functional as F
 from typing import Optional
 
 # Add flash-linear-attention to path for local imports
-root_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+root_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 fla_path = os.path.join(root_dir, 'flash-linear-attention')
 if os.path.exists(fla_path):
     sys.path.insert(0, fla_path)
